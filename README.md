@@ -1,17 +1,17 @@
 # Babel
-Minimal LLM in Jax. 
 
 ![tower of babel](assets/babel_tower.png)
 
-## ✨Features:
-- Support for FSDP on TPU pods
-- Support for LLaMA architecture
-- Support for Distributed Muon
-- Checkpointing with Orbax
+## Features
+- Minimal LLM implementation in Jax, ideal for pretraining research
+- Supports FSDP on TPU pods
+- Supports the LLaMA architecture
+- Supports Distributed Muon
+- Checkpointing with Orbax latest
 - Logging with Weights and Biases
 - Resumable training with NumPy Memmap
 
-## 🚀 Getting started
+## Getting started
 
 #### 1. Install uv
 ```
