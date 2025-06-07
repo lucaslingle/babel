@@ -4,9 +4,9 @@
 
 ## ✨ Features
 - Clean LLM implementation in Jax, ideal for pretraining research
-- FSDP on TPU pods
-- LLaMA architecture
-- Distributed Muon
+- Supports FSDP on TPU pods
+- Supports the LLaMA architecture
+- Supports Distributed Muon
 - Checkpointing with Orbax latest
 - Logging with Weights and Biases
 - Resumable training with NumPy Memmap
