@@ -1,4 +1,4 @@
-from serious_mode.configs.base import get_base_config
+from babel.configs.base import get_base_config
 
 
 def get_config():

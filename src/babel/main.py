@@ -16,18 +16,18 @@ from absl import logging
 from flax.training import train_state as train_utils
 from ml_collections import config_flags
 
-from serious_mode.data import get_tokenizer
-from serious_mode.data import get_dataset
-from serious_mode.data import get_train_batch
-from serious_mode.data import get_eval_batch
-from serious_mode.data import TOKENIZER_BOS
-from serious_mode.model import MESH_AXES
-from serious_mode.model import TransformerConfig
-from serious_mode.model import Transformer
-from serious_mode.optimizers import muon
-from serious_mode.sharding import get_namedsharding
-from serious_mode.sharding import sharding_constraint
-from serious_mode.sharding import to_global_array
+from babel.data import get_tokenizer
+from babel.data import get_dataset
+from babel.data import get_train_batch
+from babel.data import get_eval_batch
+from babel.data import TOKENIZER_BOS
+from babel.model import MESH_AXES
+from babel.model import TransformerConfig
+from babel.model import Transformer
+from babel.optimizers import muon
+from babel.sharding import get_namedsharding
+from babel.sharding import sharding_constraint
+from babel.sharding import to_global_array
 
 FLAGS = flags.FLAGS
 PROJECT_NAME = "serious_mode_muon_ablation_v2"

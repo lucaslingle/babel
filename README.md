@@ -1,6 +1,6 @@
 # Babel
 
-![tower of babel](assets/b9ee8b99-0be3-41aa-8ff2-0af485daa2fd.png)
+![tower of babel in a futuristic, cyberpunk style](assets/b9ee8b99-0be3-41aa-8ff2-0af485daa2fd_small.png)
 
 ## ✨ Features
 - Minimal LLM implementation in Jax, ideal for pretraining research

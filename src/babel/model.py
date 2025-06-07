@@ -9,8 +9,8 @@ import jax.numpy as jnp
 from flax import struct
 from flax.linen import partitioning as nnp
 
-from serious_mode.sharding import sharding_constraint
-from serious_mode.dims import Dims
+from babel.sharding import sharding_constraint
+from babel.dims import Dims
 
 
 MESH_AXES = Dims(X="X", Y="Y", N=None)
