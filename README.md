@@ -2,7 +2,7 @@
 
 ![tower of babel in a futuristic, cyberpunk style](assets/b9ee8b99-0be3-41aa-8ff2-0af485daa2fd.png)
 
-## ✨ Features
+## Features
 - Clean LLM implementation in Jax, ideal for pretraining research
 - Supports FSDP on TPU pods
 - Supports the LLaMA architecture
@@ -11,7 +11,7 @@
 - Logging with Weights and Biases
 - Resumable training with NumPy Memmap
 
-## 🚀 Getting started
+## Getting started
 
 #### 1. Install uv
 ```
