@@ -31,7 +31,7 @@ uv sync;
 
 #### 4. Run the launch script
 ```
-uv run src/serious_mode/main.py \
+uv run src/babel/main.py \
     --config=src/babel/configs/MY_CONFIG.py \
     --workdir=MY_WORKDIR \
     --group=MY_EXPERIMENT_GROUP_NAME \

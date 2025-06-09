@@ -9,15 +9,16 @@ def get_config():
     config.n_mesh_cols = 4
 
     # width
-    config.d_model = 3584
-    config.n_layer = 28
+    config.d_model = 2304
+    config.n_layer = 18
 
     # optimization
-    config.tokens_per_global_batch = 2 ** 21
+    config.tokens_per_global_batch = 2 ** 18
+    config.grad_power = 1.0
     config.optim_name = "adamw"
 
     # periodic action settings
-    config.n_pretrain_step = 50_000
-    config.n_warmup_step = 1_000
+    config.n_pretrain_step = 100_000
+    config.n_warmup_step = 2_000
 
     return config

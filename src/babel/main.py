@@ -31,7 +31,7 @@ from babel.sharding import sharding_constraint
 from babel.sharding import to_global_array
 
 FLAGS = flags.FLAGS
-PROJECT_NAME = "serious_mode_muon_ablation_v2"
+PROJECT_NAME = "babel_gradpower_ablation_part1"
 config_flags.DEFINE_config_file("config", None, "Config file", lock_config=False)
 flags.DEFINE_string("workdir", None, "Working directory (GCS or local)")
 flags.DEFINE_string("group", None, "Group name for experiment")
@@ -40,7 +40,7 @@ flags.DEFINE_string("hf_token", None, "API key for HuggingFace")
 flags.DEFINE_string("wb_token", None, "API key for Weights and Biases")
 flags.DEFINE_string("wb_runid", None, "Run ID for Weights and Biases")
 flags.DEFINE_bool("tpu", True, "Use TPU cluster?")
-flags.mark_flags_as_required(["config", "workdir", "group", "wb_token", "hf_token"])
+flags.mark_flags_as_required(["config", "workdir", "group", "hf_token", "wb_token"])
 
 
 @functools.lru_cache(maxsize=1)
