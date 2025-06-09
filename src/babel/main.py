@@ -24,7 +24,7 @@ from babel.data import TOKENIZER_BOS
 from babel.model import MESH_AXES
 from babel.model import TransformerConfig
 from babel.model import Transformer
-from babel.optimizers import muon
+from babel.optim import muon
 from babel.sharding import get_namedsharding
 from babel.sharding import sharding_constraint
 from babel.sharding import to_global_array
