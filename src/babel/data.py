@@ -9,6 +9,7 @@ import datasets
 import huggingface_hub
 import numpy as np
 import jax
+import jax.numpy as jnp
 import tqdm
 import transformers
 from absl import logging
@@ -201,3 +202,10 @@ def get_eval_batch(shard, local_batch_size, sequence_len, eval_step, n_eval_step
     shape = (local_batch_size, sequence_len + int(TOKENIZER_BOS))
     batch = shard[offset:offset+tokens_per_read].reshape(*shape)
     return batch
+
+
+def get_debug_batch(local_batch_size, sequence_len):
+    return 42 * jnp.ones(
+        shape=(local_batch_size, sequence_len + int(TOKENIZER_BOS)),
+        dtype=ARRAY_DTYPE,
+    )

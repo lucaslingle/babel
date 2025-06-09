@@ -22,6 +22,7 @@ def get_base_config():
     # optimization
     config.tokens_per_global_batch = 2**18  # batch size * sequence len
     config.grad_clip = 1.0  # grad clip max l2 norm
+    config.grad_power = 1.0  # gradpower exponent, 1.0 is equiv to not using
     config.lr_eta = 0.0003  # base learning rate
     config.lr_schedule_name = "cosine"
     config.lr_schedule_end_frac = 0.1

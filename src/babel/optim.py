@@ -14,6 +14,26 @@ from typing import Any, Optional, Union, NamedTuple
 MaskOrFn = Optional[Union[Any, Callable[[base.Params], Any]]]
 
 
+def gradpower(
+    power: float = 1.2
+) -> base.GradientTransformation:
+    """
+      Reference:
+        Wang et al., `GradPower: Powering Gradients for Faster Language Model Pre-Training
+        <https://arxiv.org/abs/2505.24275>`_, 2025
+    """
+
+    def update_fn(updates, state, params):
+        sign_ = jax.tree.map(jnp.sign, updates)
+        abs_ = jax.tree.map(jnp.abs, updates)
+        pow_ = jax.tree.map(lambda x: jnp.power(x, power), abs_)
+        updates = jax.tree.map(lambda x, y: x * y, sign_, pow_)
+        return updates, state
+
+    return base.GradientTransformation(base.init_empty_state, update_fn)
+
+
+
 def orthogonalize_matrix(
     x: jax.Array,  # should have shape (n_layer, in_dim, out_dim)
     ns_steps: int = 5,

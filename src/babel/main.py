@@ -24,7 +24,8 @@ from babel.data import TOKENIZER_BOS
 from babel.model import MESH_AXES
 from babel.model import TransformerConfig
 from babel.model import Transformer
-from babel.optimizers import muon
+from babel.optim import muon
+from babel.optim import gradpower
 from babel.sharding import get_namedsharding
 from babel.sharding import sharding_constraint
 from babel.sharding import to_global_array
@@ -109,6 +110,8 @@ def grad_transform_factory():
     chain = []
     if FLAGS.config.grad_clip > 0.0:
         chain.append(optax.clip_by_global_norm(FLAGS.config.grad_clip))
+    if FLAGS.config.grad_power != 1.0:
+        chain.append(gradpower(FLAGS.config.grad_power))
     chain.append(get_optimizer())
     if FLAGS.config.wd_indep:
         chain.append(optax.add_decayed_weights(-FLAGS.config.wd_lam))
