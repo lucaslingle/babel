@@ -342,8 +342,8 @@ def eval_loop(state):
         batch = to_global_array(batch, global_mesh)
         metrics = eval_step_op(state, batch)
         eval_step_logging_op(metrics, step)
-        loss_terms.append(metrics["loss_term_avg"])
-        mask_terms.append(metrics["loss_mask_avg"])
+        loss_terms.append(metrics["loss_term_avg"].astype(jnp.float32))
+        mask_terms.append(metrics["loss_mask_avg"].astype(jnp.float32))
 
     loss_terms_avg = sum(loss_terms) / len(loss_terms)
     mask_terms_avg = sum(mask_terms) / len(mask_terms)
