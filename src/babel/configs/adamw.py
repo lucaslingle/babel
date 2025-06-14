@@ -15,6 +15,7 @@ def get_config():
     # optimization
     config.tokens_per_global_batch = 2 ** 21
     config.optim_name = "adamw"
+    config.optim_dtype = "float32"
 
     # periodic action settings
     config.n_pretrain_step = 50_000

@@ -26,6 +26,7 @@ def get_base_config():
     config.lr_schedule_name = "cosine"
     config.lr_schedule_end_frac = 0.1
     config.optim_name = "adamw"
+    config.optim_dtype = "bfloat16"
     config.optim_beta1 = 0.9
     config.optim_beta2 = 0.95
     config.optim_eps = 1e-8

@@ -30,7 +30,7 @@ from babel.sharding import sharding_constraint
 from babel.sharding import to_global_array
 
 FLAGS = flags.FLAGS
-PROJECT_NAME = "serious_mode_muon_ablation_v2"
+PROJECT_NAME = "babel_muon_fp32_ablation"
 config_flags.DEFINE_config_file("config", None, "Config file", lock_config=False)
 flags.DEFINE_string("workdir", None, "Working directory (GCS or local)")
 flags.DEFINE_string("group", None, "Group name for experiment")
@@ -91,7 +91,7 @@ def get_optimizer():
         b1=FLAGS.config.optim_beta1,
         b2=FLAGS.config.optim_beta2,
         eps=FLAGS.config.optim_eps,
-        mu_dtype=FLAGS.config.dtype,
+        mu_dtype=FLAGS.config.optim_dtype,
         weight_decay=0.0 if FLAGS.config.wd_indep else FLAGS.config.wd_lam,
     )
     if FLAGS.config.optim_name == "adamw":
