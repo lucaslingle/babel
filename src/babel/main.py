@@ -18,9 +18,9 @@ from ml_collections import config_flags
 
 from babel.data import get_tokenizer
 from babel.data import get_dataset
-from babel.data import get_train_batch
-from babel.data import get_eval_batch
-from babel.data import TOKENIZER_BOS
+from babel.data import get_batch
+from babel.data import count_batches
+from babel.data import DATASET_CONFIGS
 from babel.model import MESH_AXES
 from babel.model import TransformerConfig
 from babel.model import Transformer
@@ -30,7 +30,7 @@ from babel.sharding import sharding_constraint
 from babel.sharding import to_global_array
 
 FLAGS = flags.FLAGS
-PROJECT_NAME = "babel_muon_fp32_ablation_medium"
+PROJECT_NAME = "babel_sweeps_paper"
 config_flags.DEFINE_config_file("config", None, "Config file", lock_config=False)
 flags.DEFINE_string("workdir", None, "Working directory (GCS or local)")
 flags.DEFINE_string("group", None, "Group name for experiment")
@@ -43,10 +43,16 @@ flags.mark_flags_as_required(["config", "workdir", "group", "wb_token", "hf_toke
 
 
 @functools.lru_cache(maxsize=1)
+def get_dataset_config():
+    return DATASET_CONFIGS[FLAGS.config.dataset]
+
+
+@functools.lru_cache(maxsize=1)
 def get_transformer_config():
     return TransformerConfig.create(
         **vars(FLAGS.config)["_fields"],
-        n_vocab=len(get_tokenizer(FLAGS.hf_token)),
+        n_ctx=get_dataset_config().sequence_len,
+        n_vocab=len(get_tokenizer(dataset_config=get_dataset_config(), hf_token=FLAGS.hf_token)),
     )
 
 
@@ -203,17 +209,18 @@ def get_loss_mask(tgt, pad_id):
     return jnp.logical_not(jnp.equal(tgt, pad_id))
 
 
-def extract_input_and_target(batch):
-    if TOKENIZER_BOS:
+def extract_input_and_target(batch, dataset_config):
+    if dataset_config.tokenizer_adds_bos:
         # in this case, the array shape is (bsz, seqlen+1), and we slice only,
         # obtaining inp, tgt shapes of (bsz, seqlen).
         inp, tgt = batch[:, 0:-1], batch[:, 1:]
     else:
         # in this case, the array shape is (bsz, seqlen), and we slice and pad
         # obtaining inp, tgt shapes of (bsz, seqlen).
-        bos_token_id = get_tokenizer(FLAGS.hf_token).bos_token_id
-        if bos_token_id is None:
-            bos_token_id = get_tokenizer(FLAGS.hf_token).pad_token_id
+        bos_token_id = get_tokenizer(
+            dataset_config=dataset_config, 
+            hf_token=FLAGS.hf_token,
+        ).bos_token_id
         inp = jnp.pad(
             batch[:, 0:-1],
             pad_width=((0, 0), (1, 0)),
@@ -283,24 +290,24 @@ def train_loop():
     state, start_step = do_restore(mgr, state)
 
     n_host = jax.process_count()
-    n_ctx = FLAGS.config.n_ctx
+    n_ctx = get_dataset_config().sequence_len
     local_batch_size = FLAGS.config.tokens_per_global_batch // (n_host * n_ctx)
-    ds_shard = get_dataset(
-        hf_token=FLAGS.hf_token,
+    ds_train_shard = get_dataset(
         local_batch_size=local_batch_size,
-        sequence_len=n_ctx,
+        dataset_config=get_dataset_config(),
+        split="train",
         workdir=FLAGS.workdir,
+        hf_token=FLAGS.hf_token,
     )
 
     eval_loss = None
     t0 = time.perf_counter()
-    for step in range(start_step, FLAGS.config.n_pretrain_step):
-        batch = get_train_batch(
-            shard=ds_shard,
+    for train_step in range(start_step, FLAGS.config.n_pretrain_step):
+        batch = get_batch(
+            shard=ds_train_shard,
             local_batch_size=local_batch_size,
-            sequence_len=n_ctx,
-            train_step=step,
-            n_eval_step=FLAGS.config.n_eval_step,
+            dataset_config=get_dataset_config(),
+            step=train_step,
         )
         batch = to_global_array(batch, global_mesh)
         state, metrics = train_step_op(state, batch)
@@ -320,24 +327,29 @@ def eval_loop(state):
     global_mesh = get_global_mesh()
 
     n_host = jax.process_count()
-    n_ctx = FLAGS.config.n_ctx
+    n_ctx = get_dataset_config().sequence_len
     local_batch_size = FLAGS.config.tokens_per_global_batch // (n_host * n_ctx)
-    ds_shard = get_dataset(
-        hf_token=FLAGS.hf_token,
+    ds_test_shard = get_dataset(
         local_batch_size=local_batch_size,
-        sequence_len=n_ctx,
+        dataset_config=get_dataset_config(),
+        split="test",
         workdir=FLAGS.workdir,
+        hf_token=FLAGS.hf_token,
+    )
+    batch_count = count_batches(
+        shard=shard, 
+        local_batch_size=local_batch_size,
+        dataset_config=get_dataset_config(),
     )
 
     loss_terms = []
     mask_terms = []
-    for step in range(0, FLAGS.config.n_eval_step):
-        batch = get_eval_batch(
-            shard=ds_shard,
+    for eval_step in range(0, batch_count):
+        batch = get_batch(
+            shard=ds_test_shard,
             local_batch_size=local_batch_size,
-            sequence_len=n_ctx,
-            eval_step=step,
-            n_eval_step=FLAGS.config.n_eval_step,
+            dataset_config=get_dataset_config(),
+            step=eval_step,
         )
         batch = to_global_array(batch, global_mesh)
         metrics = eval_step_op(state, batch)

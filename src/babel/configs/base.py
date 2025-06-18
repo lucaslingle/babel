@@ -5,11 +5,11 @@ def get_base_config():
     config = config_dict.ConfigDict()
     config.n_mesh_rows = 128
     config.n_mesh_cols = 1
+    config.dataset = "fineweb"
 
     # architecture
     config.param_dtype = "float32"  # master copy of weights in fp32
     config.dtype = "bfloat16"  # weights and activations are in bfloat16 on fwd/bwd
-    config.n_ctx = 256  # sequence length
     config.n_layer = 16  # depth
     config.d_model = 2048  # width
     config.d_head = 128

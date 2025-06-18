@@ -3,6 +3,7 @@ import math
 import os
 import posixpath
 import time
+import collections
 
 import blobfile
 import datasets
@@ -14,40 +15,101 @@ import transformers
 from absl import logging
 
 
-HF_PATH = "HuggingFaceFW/fineweb"
-HF_NAME = "sample-350BT"
-HF_SPLIT = "train"
-HF_DATACOL = "text"
-SEQUENCES_IN_DATASET = 517_000_000  # a conservative estimate, will drop rest
-ARRAY_DTYPE = np.uint16
-WRITE_BUFFER_SIZE = 512
-TOKENIZER = "meta-llama/Llama-2-7b-hf"
-TOKENIZER_BOS = True
+DatasetConfig = collections.namedtuple("DatasetConfig", [
+    "path",
+    "name",
+    "split",
+    "datacol",
+    "sequences_in_dataset",
+    "array_dtype",
+    "write_buffer_size",
+    "tokenizer",
+    "tokenizer_adds_bos",
+])
+
+
+DATASET_CONFIGS = dict(
+    fineweb=DatasetConfig(
+        path="HuggingFaceFW/fineweb",
+        name="sample-350BT",
+        original_split="train",
+        datacol="text",
+        sequences_in_dataset=517_000_000,
+        array_dtype=np.uint16,
+        write_buffer_size=512,
+        tokenizer="meta-llama/Llama-2-7b-hf",
+        tokenizer_adds_bos=True,
+        sequence_len=256,
+        test_frac=0.01,
+    ),
+    commonpile=DatasetConfig(
+        path="common-pile/comma_v0.1_training_dataset"
+        name=None,
+        original_split="train",
+        datacol="text",
+        sequences_in_dataset=783_000_000,
+        array_dtype=np.uint16,
+        write_buffer_size=512,
+        tokenizer="meta-llama/Llama-2-7b-hf",
+        tokenizer_adds_bos=True,
+        sequence_len=256,
+        test_frac=0.01,
+    ),
+    cci3hq=DatasetConfig(
+        path="BAAI/CCI3-HQ",
+        name=None,
+        original_split="train",
+        datacol="text",
+        sequences_in_dataset=53_000_000,
+        array_dtype=np.uint32,
+        write_buffer_size=512,
+        tokenizer="google/byt5-small",
+        tokenizer_adds_bos=False,
+        sequence_len=256,  # this truncates a lot but needed for small bsz 32k toks on 128 cores. 
+        test_frac=0.01,  # ^ this still leaves 13 billion toks, and we arent using that many in sweeps
+    )
+)
 
 
 @functools.lru_cache(maxsize=1)
-def get_tokenizer(hf_token):
+def get_tokenizer(*, dataset_config, hf_token):
     huggingface_hub.login(token=hf_token)
-    tokenizer = transformers.AutoTokenizer.from_pretrained(TOKENIZER)
-    if TOKENIZER == "meta-llama/Llama-2-7b-hf":
+    tokenizer = transformers.AutoTokenizer.from_pretrained(dataset_config.tokenizer)
+    if dataset_config.tokenizer == "meta-llama/Llama-2-7b-hf":
         tokenizer.pad_token = tokenizer.bos_token
+    if dataset_config.tokenizer == "google/byt5-small":
+        tokenizer.bos_token = tokenizer.pad_token
     return tokenizer
 
 
-def _get_shard_fps(workdir, pcount, pindex):
+def _get_shard_fps(*, dataset_config, split, pcount, pindex, workdir):
     remote_fp = posixpath.join(
-        workdir, "datasets", HF_PATH, HF_NAME, TOKENIZER, f"{pcount}", f"{HF_SPLIT}-{pindex}.bin"
+        workdir, 
+        "datasets", 
+        dataset_config.path, 
+        dataset_config.name, 
+        dataset_config.tokenizer, 
+        f"{pcount}", 
+        f"{split}-{pindex}.bin",
     )
     local_fp = posixpath.join(
-        "/tmp/", f"{HF_SPLIT}-{pindex}.bin"
+        "/tmp/", 
+        f"{split}-{pindex}.bin",
     )
     return remote_fp, local_fp
 
 
-def write_dataset(hf_token, local_batch_size, sequence_len, workdir):
+def write_dataset(*, local_batch_size, dataset_config, split, workdir, hf_token):
+    dc = dataset_config
     pcount = jax.process_count()
     pindex = jax.process_index()
-    remote_fp, local_fp = _get_shard_fps(workdir=workdir, pcount=pcount, pindex=pindex)
+    remote_fp, local_fp = _get_shard_fps(
+        dataset_config=dataset_config,
+        split=split,
+        pcount=pcount, 
+        pindex=pindex, 
+        workdir=workdir
+    )
 
     if blobfile.exists(remote_fp):
         logging.info(f"Mem-mapped file exists at {remote_fp}, skipping write...")
@@ -57,25 +119,26 @@ def write_dataset(hf_token, local_batch_size, sequence_len, workdir):
 
     huggingface_hub.login(token=hf_token)
     ds = datasets.load_dataset(
-        path=HF_PATH,
-        name=HF_NAME,
-        split=HF_SPLIT,
+        path=dc.path,
+        name=dc.name,
+        split=dc.original_split,
         streaming=True,
     )
-    tokenizer = get_tokenizer(hf_token)
+    ds = ds.train_test_split(test_size=dc.test_frac)[split]
+    tokenizer = get_tokenizer(dataset_config=dc, hf_token=hf_token)
 
     def processing_func(examples):
-        es = examples[HF_DATACOL]
+        es = examples[dc.datacol]
         es = [e for i, e in enumerate(es) if i % pcount == pindex]
         kws = dict(
             padding="max_length",
             truncation=True,
-            max_length=sequence_len + int(TOKENIZER_BOS),
+            max_length=dc.sequence_len + int(dc.tokenizer_adds_bos),
         )
-        es = tokenizer(es, **kws)["input_ids"]   # assumes bos prepend by tokenizer
+        es = tokenizer(es, **kws)["input_ids"]
         return dict(token_ids=es)
 
-    processing_bsz = WRITE_BUFFER_SIZE * pcount
+    processing_bsz = dc.write_buffer_size * pcount
     ds = ds.map(
         processing_func,
         batched=True,
@@ -83,21 +146,27 @@ def write_dataset(hf_token, local_batch_size, sequence_len, workdir):
         remove_columns=list(ds.column_names),
     )
 
-    sequences_per_shard = SEQUENCES_IN_DATASET // pcount
-    lcm = math.lcm(WRITE_BUFFER_SIZE, local_batch_size)
+    sequences_in_dataset = dc.sequences_in_dataset
+    if split == "train":
+        sequences_in_dataset *= (1 - dc.test_frac)
+    else:
+        sequences_in_dataset *= dc.test_frac
+    
+    sequences_per_shard = sequences_in_dataset // pcount
+    lcm = math.lcm(dc.write_buffer_size, local_batch_size)
     writable_sequences_per_shard = (sequences_per_shard // lcm) * lcm
     ds = ds.take(writable_sequences_per_shard)  # drop rest via lazy op
-    ds = ds.iter(batch_size=WRITE_BUFFER_SIZE, drop_last_batch=True)
+    ds = ds.iter(batch_size=dc.write_buffer_size, drop_last_batch=True)
 
-    n_write_iters = writable_sequences_per_shard // WRITE_BUFFER_SIZE
+    n_write_iters = writable_sequences_per_shard // dc.write_buffer_size
     array = np.memmap(
         local_fp,
-        dtype=ARRAY_DTYPE,
+        dtype=dc.array_dtype,
         mode="w+",
-        shape=(writable_sequences_per_shard * (sequence_len+int(TOKENIZER_BOS)),)
+        shape=(writable_sequences_per_shard * (dc.sequence_len+int(dc.tokenizer_adds_bos)),)
     )
     offset = 0
-    increment = WRITE_BUFFER_SIZE * (sequence_len+int(TOKENIZER_BOS))
+    increment = dc.write_buffer_size * (dc.sequence_len+int(dc.tokenizer_adds_bos))
     for _ in tqdm.tqdm(range(n_write_iters), desc=f"Writing to {local_fp} with memmap"):
         batch = None
         while batch is None:
@@ -105,7 +174,7 @@ def write_dataset(hf_token, local_batch_size, sequence_len, workdir):
                 batch = next(ds)["token_ids"]
             except BaseException as e:
                 time.sleep(1)
-        array_batch = np.array(batch, dtype=ARRAY_DTYPE).reshape(-1)
+        array_batch = np.array(batch, dtype=dc.array_dtype).reshape(-1)
         array[offset: offset + increment] = array_batch
         offset += increment
     array.flush()
@@ -114,90 +183,50 @@ def write_dataset(hf_token, local_batch_size, sequence_len, workdir):
     blobfile.copy(local_fp, remote_fp, overwrite=True)
 
 
-def read_dataset(workdir):
+def read_dataset(*, dataset_config, split, workdir):
     remote_fp, local_fp = _get_shard_fps(
-        workdir=workdir,
-        pcount=jax.process_count(),
-        pindex=jax.process_index(),
+        dataset_config=dataset_config,
+        split=split,
+        pcount=jax.process_count(), 
+        pindex=jax.process_index(), 
+        workdir=workdir
     )
     if not blobfile.exists(local_fp):
         logging.info(f"Copying {remote_fp} to {local_fp}")
         blobfile.copy(remote_fp, local_fp, overwrite=True)
     logging.info(f"Reading with np.memmap...")
-    array = np.memmap(local_fp, dtype=ARRAY_DTYPE, mode="r")
+    array = np.memmap(local_fp, dtype=dataset_config.array_dtype, mode="r")
     return array
 
 
-def get_dataset(hf_token, local_batch_size, sequence_len, workdir):
-    write_dataset(hf_token, local_batch_size, sequence_len, workdir)
-    return read_dataset(workdir)
+def get_dataset(*, local_batch_size, dataset_config, split, workdir, hf_token):
+    write_dataset(
+        local_batch_size=local_batch_size, 
+        dataset_config=dataset_config, 
+        split=split, 
+        workdir=workdir, 
+        hf_token=hf_token,
+    )
+    return read_dataset(
+        dataset_config=dataset_config, 
+        split=split, 
+        workdir=workdir,
+    )
 
 
-def get_train_batch(shard, local_batch_size, sequence_len, train_step, n_eval_step):
-    """
-    worked example
-
-    tokens_per_shard = 48
-    local_batch_size = 4
-    sequence_len = 2
-    TOKENIZER_BOS = true
-    n_eval_step = 2
-
-    tokens_per_read = 4 * (2 + 1) = 12
-    train_tokens_per_shard = 48 - 2 * 12 = 24
-
-    train_step = 0
-    offset = 0, so covers first tokens_per_read = 12 tokens.
-
-    train_step = 1
-    offset = (1 * 12) % 24 = 12, so covers next tokens_per_read = 12 tokens.
-
-    train_step = 2
-    offset = (2 * 12) % 24 = 0, so covers first tokens_per_read = 12 tokens.
-
-    the pattern is that the last
-        n_eval_step * tokens_per_read = 2 * 12 = 24
-    tokens in shard remain unread by get_train_batch
-    """
+def get_batch(*, shard, local_batch_size, dataset_config, step):
+    dc = dataset_config
     tokens_per_shard = shard.shape[0]
-    tokens_per_read = local_batch_size * (sequence_len + int(TOKENIZER_BOS))
-    train_tokens_per_shard = tokens_per_shard - n_eval_step * tokens_per_read
-    assert train_tokens_per_shard > 0
+    tokens_per_read = local_batch_size * (dc.sequence_len + int(dc.tokenizer_adds_bos))
 
-    offset = (train_step * tokens_per_read) % train_tokens_per_shard
-    shape = (local_batch_size, sequence_len + int(TOKENIZER_BOS))
+    offset = (step * tokens_per_read) % tokens_per_shard
+    shape = (local_batch_size, (dc.sequence_len + int(dc.tokenizer_adds_bos)))
     batch = shard[offset:offset+tokens_per_read].reshape(*shape)
     return batch
 
 
-def get_eval_batch(shard, local_batch_size, sequence_len, eval_step, n_eval_step):
-    """
-    worked example
-
-    tokens_per_shard = 48
-    local_batch_size = 4
-    sequence_len = 2
-    TOKENIZER_BOS = true
-    n_eval_step = 2
-
-    tokens_per_read = 4 * (2 + 1) = 12
-    train_tokens_per_shard = 48 - 2 * 12 = 24
-
-    eval_step = 0
-    offset = 24 + (0 * 12) = 24
-
-    eval_step = 1
-    offset = 24 + (1 * 12) = 36
-
-    eval_step = 2 -> assertion error
-    """
-    assert eval_step < n_eval_step
+def count_batches(*, shard, local_batch_size, dataset_config):
+    dc = dataset_config
     tokens_per_shard = shard.shape[0]
-    tokens_per_read = local_batch_size * (sequence_len + int(TOKENIZER_BOS))
-    train_tokens_per_shard = tokens_per_shard - n_eval_step * tokens_per_read
-    assert train_tokens_per_shard > 0
-
-    offset = train_tokens_per_shard + (eval_step * tokens_per_read)
-    shape = (local_batch_size, sequence_len + int(TOKENIZER_BOS))
-    batch = shard[offset:offset+tokens_per_read].reshape(*shape)
-    return batch
+    tokens_per_read = local_batch_size * (dc.sequence_len + int(dc.tokenizer_adds_bos))
+    return tokens_per_shard // tokens_per_read
