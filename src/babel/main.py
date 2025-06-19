@@ -261,7 +261,8 @@ def get_loss_mask(tgt, pad_id):
     return jnp.logical_not(jnp.equal(tgt, pad_id))
 
 
-def extract_input_and_target(batch, dataset_config):
+def extract_input_and_target(batch):
+    dataset_config = get_dataset_config()
     if dataset_config.tokenizer_adds_bos:
         # in this case, the array shape is (bsz, seqlen+1), and we slice only,
         # obtaining inp, tgt shapes of (bsz, seqlen).
@@ -289,7 +290,8 @@ def loss_fn(params, batch):
     logits = Transformer(config, global_mesh).apply({"params": params}, inp)
     terms = optax.softmax_cross_entropy_with_integer_labels(logits=logits, labels=tgt)
     terms = sharding_constraint(terms, MESH_AXES["XN"], global_mesh)
-    mask = get_loss_mask(tgt, pad_id=get_tokenizer(FLAGS.hf_token).pad_token_id)
+    pad_id = get_tokenizer(dataset_config=get_dataset_config(), hf_token=FLAGS.hf_token).pad_token_id
+    mask = get_loss_mask(tgt=tgt, pad_id=pad_id)
     metrics = dict(
         loss_term_avg=jnp.mean(mask * terms),
         loss_mask_avg=jnp.mean(mask),
