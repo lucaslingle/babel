@@ -360,12 +360,12 @@ def train_loop():
 
     eval_loss = None
     t0 = time.perf_counter()
-    for train_step in range(start_step, get_n_pretrain_step()):
+    for step in range(start_step, get_n_pretrain_step()):
         batch = get_batch(
             shard=ds_train_shard,
             local_batch_size=local_batch_size,
             dataset_config=get_dataset_config(),
-            step=train_step,
+            step=step,
         )
         batch = to_global_array(batch, global_mesh)
         state, metrics = train_step_op(state, batch)
@@ -406,12 +406,12 @@ def eval_loop(state):
 
     loss_terms = []
     mask_terms = []
-    for eval_step in range(0, batch_count):
+    for step in range(0, batch_count):
         batch = get_batch(
             shard=ds_test_shard,
             local_batch_size=local_batch_size,
             dataset_config=get_dataset_config(),
-            step=eval_step,
+            step=step,
         )
         batch = to_global_array(batch, global_mesh)
         metrics = eval_step_op(state, batch)
