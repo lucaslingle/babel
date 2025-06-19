@@ -184,12 +184,16 @@ def write_dataset(*, local_batch_size, dataset_config, split, workdir, hf_token)
     increment = dc.write_buffer_size * (dc.sequence_len+int(dc.tokenizer_adds_bos))
     for _ in tqdm.tqdm(range(n_write_iters), desc=f"Writing to {local_fp} with memmap"):
         batch = None
+        tries = 0
         while batch is None:
             try:
                 batch = next(ds)["token_ids"]
             except BaseException as e:
-                #time.sleep(1)
-                raise Exception(e)
+                if tries < 10:
+                    time.sleep(10)
+                    tries += 1
+                else:
+                    raise Exception(e)
         array_batch = np.array(batch, dtype=dc.array_dtype).reshape(-1)
         array[offset: offset + increment] = array_batch
         offset += increment
