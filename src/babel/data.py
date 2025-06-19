@@ -42,7 +42,6 @@ DATASET_CONFIGS = dict(
         tokenizer="meta-llama/Llama-2-7b-hf",
         tokenizer_adds_bos=True,
         sequence_len=256,
-        test_frac=0.01,
     ),
     commonpile=DatasetConfig(
         path="common-pile/comma_v0.1_training_dataset",
@@ -55,7 +54,6 @@ DATASET_CONFIGS = dict(
         tokenizer="meta-llama/Llama-2-7b-hf",
         tokenizer_adds_bos=True,
         sequence_len=256,
-        test_frac=0.01,
     ),
     cci3hq=DatasetConfig(
         path="BAAI/CCI3-HQ",
@@ -67,8 +65,7 @@ DATASET_CONFIGS = dict(
         write_buffer_size=512,
         tokenizer="google/byt5-small",
         tokenizer_adds_bos=False,
-        sequence_len=256,  # this truncates a lot but needed for small bsz 32k toks on 128 cores. 
-        test_frac=0.01,  # ^ this still leaves 13 billion toks, and we arent using that many in sweeps
+        sequence_len=256,  # this leaves 13 billion toks and we arent using that many for sweeps
     )
 )
 
@@ -166,12 +163,13 @@ def write_dataset(*, local_batch_size, dataset_config, split, workdir, hf_token)
 
     sequences_in_dataset = dc.sequences_in_dataset
     if split == "train":
-        sequences_in_dataset *= (1 - dc.test_frac)
+        sequences_in_dataset *= 0.99
     else:
-        sequences_in_dataset *= dc.test_frac
+        sequences_in_dataset *= 0.01
+    sequences_in_dataset = int(sequences_in_dataset)
     
     sequences_per_shard = sequences_in_dataset // pcount
-    lcm = math.lcm(dc.write_buffer_size, local_batch_size)
+    lcm = int(math.lcm(dc.write_buffer_size, local_batch_size))
     writable_sequences_per_shard = (sequences_per_shard // lcm) * lcm
     ds = ds.take(writable_sequences_per_shard)  # drop rest via lazy op
     ds = ds.iter(batch_size=dc.write_buffer_size, drop_last_batch=True)
