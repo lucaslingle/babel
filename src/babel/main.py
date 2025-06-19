@@ -73,6 +73,8 @@ def get_d_model():
 
 
 def get_n_pretrain_step():
+    logging.info(f"type(FLAGS.config.token_budget): {type(FLAGS.config.token_budget)}")
+    logging.info(f"type(FLAGS.config.tokens_per_global_batch): {type(FLAGS.config.tokens_per_global_batch)}")
     return FLAGS.config.token_budget // FLAGS.config.tokens_per_global_batch
 
 
@@ -360,6 +362,8 @@ def train_loop():
 
     eval_loss = None
     t0 = time.perf_counter()
+    logging.info(f"type(start_step): {type(start_step)}")
+    logging.info(f"type(get_n_pretrain_step()): {type(get_n_pretrain_step())}")
     for train_step in range(start_step, get_n_pretrain_step()):
         batch = get_batch(
             shard=ds_train_shard,
