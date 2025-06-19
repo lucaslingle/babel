@@ -48,15 +48,15 @@ def get_depth_and_width():
     assert FLAGS.config.ff_multiple == 3.0
 
     n = FLAGS.config.model_size
-    if FLAGS.scaling_lock == "aspect":
+    if FLAGS.config.scaling_lock == "aspect":
         n_layer = int(math.ceil((n / (13 * 128 * 128)) ** 0.33))
         d_model = 128 * n_layer
         return (n_layer, d_model)
-    elif FLAGS.scaling_lock == "depth":
+    elif FLAGS.config.scaling_lock == "depth":
         n_layer = 6
         d_model = (int(math.ceil((n / (13 * n_layer)) ** 0.5)) // 128) * 128
         return (n_layer, d_model)
-    elif FLAGS.scaling_lock == "width":
+    elif FLAGS.config.scaling_lock == "width":
         d_model = 768;
         n_layer = int(math.ceil(n / (13 * d_model ** 2)))
         return (n_layer, d_model)
