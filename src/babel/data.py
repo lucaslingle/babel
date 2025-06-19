@@ -43,7 +43,7 @@ DATASET_CONFIGS = dict(
         test_frac=0.01,
     ),
     commonpile=DatasetConfig(
-        path="common-pile/comma_v0.1_training_dataset"
+        path="common-pile/comma_v0.1_training_dataset",
         name=None,
         original_split="train",
         datacol="text",
