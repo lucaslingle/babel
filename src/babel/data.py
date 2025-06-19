@@ -132,12 +132,12 @@ def write_dataset(*, local_batch_size, dataset_config, split, workdir, hf_token)
         def filter_func(examples):
             es = examples[dc.datacol]
             es = [e for i, e in enumerate(es) if i % 100 < 99]
-            return dict(dc.datacol=es)
+            return dict(filtered_text=es)
     else:
         def filter_func(examples):
             es = examples[dc.datacol]
             es = [e for i, e in enumerate(es) if i % 100 == 99]
-            return dict(dc.datacol=es)
+            return dict(filtered_text=es)
 
     ds = ds.map(
         filter_func,
@@ -147,7 +147,7 @@ def write_dataset(*, local_batch_size, dataset_config, split, workdir, hf_token)
     )
 
     def processing_func(examples):
-        es = examples[dc.datacol]
+        es = examples["filtered_text"]
         es = [e for i, e in enumerate(es) if i % pcount == pindex]
         kws = dict(
             padding="max_length",
