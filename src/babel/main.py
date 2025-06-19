@@ -399,7 +399,7 @@ def eval_loop(state):
         hf_token=FLAGS.hf_token,
     )
     batch_count = count_batches(
-        shard=shard, 
+        shard=ds_test_shard, 
         local_batch_size=local_batch_size,
         dataset_config=get_dataset_config(),
     )
