@@ -209,9 +209,9 @@ def get_train_state(rng_init):
 
 def get_ndbe():
     # returns (param ct, token ct, global bsz in tokens, lr)
-    nl = FLAGS.config.n_layer
-    dm = FLAGS.config.d_model
-    dff = int(FLAGS.config.d_model * FLAGS.config.ff_multiple)
+    nl = get_n_layer()
+    dm = get_d_model()
+    dff = int(get_d_model() * FLAGS.config.ff_multiple)
     ff_proj_ct = 3
     ns = get_n_pretrain_step()
     bsz = FLAGS.config.tokens_per_global_batch
