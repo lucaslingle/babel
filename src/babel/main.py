@@ -1,6 +1,7 @@
 import functools
 import posixpath
 import time
+import math
 
 import flax.linen as nn
 import jax
@@ -43,14 +44,49 @@ flags.mark_flags_as_required(["config", "workdir", "group", "wb_token", "hf_toke
 
 
 @functools.lru_cache(maxsize=1)
+def get_depth_and_width():
+    assert FLAGS.config.ff_multiple == 3.0
+
+    n = FLAGS.config.model_size
+    if FLAGS.scaling_lock == "aspect":
+        n_layer = int(math.ceil((n / (13 * 128 * 128)) ** 0.33))
+        d_model = 128 * n_layer
+        return (n_layer, d_model)
+    elif FLAGS.scaling_lock == "depth":
+        n_layer = 6
+        d_model = (int(math.ceil((n / (13 * n_layer)) ** 0.5)) // 128) * 128
+        return (n_layer, d_model)
+    elif FLAGS.scaling_lock == "width":
+        d_model = 768;
+        n_layer = int(math.ceil(n / (13 * d_model ** 2)))
+        return (n_layer, d_model)
+    else:
+        raise NotImplementedError
+
+
+def get_n_layer():
+    return get_depth_and_width()[0]
+
+
+def get_d_model():
+    return get_depth_and_width()[1]
+
+
+def get_n_pretrain_step():
+    return FLAGS.config.token_budget // FLAGS.config.tokens_per_global_batch
+
+
+@functools.lru_cache(maxsize=1)
 def get_dataset_config():
-    return DATASET_CONFIGS[FLAGS.config.dataset]
+    return DATASET_CONFIGS[FLAGS.config.dataset_name]
 
 
 @functools.lru_cache(maxsize=1)
 def get_transformer_config():
     return TransformerConfig.create(
         **vars(FLAGS.config)["_fields"],
+        d_model=get_d_model(),
+        n_layer=get_n_layer(),
         n_ctx=get_dataset_config().sequence_len,
         n_vocab=len(get_tokenizer(dataset_config=get_dataset_config(), hf_token=FLAGS.hf_token)),
     )
@@ -58,12 +94,16 @@ def get_transformer_config():
 
 @functools.lru_cache(maxsize=1)
 def get_global_mesh():
+    # mesh settings were optimized via trial and error for tpu v3
+    assert jax.process_count() == 128
+    n_mesh_rows = 128 if FLAGS.config.model_size < 10 ** 9 else 32
+    n_mesh_cols = 1 if FLAGS.config.model_size < 10 ** 9 else 4
     return jax.sharding.Mesh(
         devices=jmu.create_device_mesh(
-            mesh_shape=(FLAGS.config.n_mesh_rows, FLAGS.config.n_mesh_cols),
+            mesh_shape=(n_mesh_rows, n_mesh_cols),
             devices=jax.devices(),
         ),
-        axis_names=("X", "Y"),  # using 2D-finalized from GSPMD paper
+        axis_names=("X", "Y"),  # we will be using 2D-finalized from GSPMD paper
     )
 
 
@@ -79,9 +119,9 @@ def get_params(rng, global_mesh):
 
 
 def get_schedule():
-    warmup_steps = FLAGS.config.n_warmup_step
-    annealing_steps = FLAGS.config.n_pretrain_step - FLAGS.config.n_warmup_step
-    end = FLAGS.config.lr_schedule_end_frac
+    warmup_steps = int(FLAGS.config.lr_schedule_warmup_frac * get_n_pretrain_step())
+    annealing_steps = get_n_pretrain_step() - warmup_steps
+    end = FLAGS.config.lr_schedule_end_value_frac
     warmup = optax.linear_schedule(0.0, 1.0, transition_steps=warmup_steps)
     if FLAGS.config.lr_schedule_name == "linear":
         annealing = optax.linear_schedule(1.0, end, transition_steps=annealing_steps)
@@ -93,19 +133,31 @@ def get_schedule():
 
 
 def get_optimizer():
-    common_kwargs = dict(
-        b1=FLAGS.config.optim_beta1,
-        b2=FLAGS.config.optim_beta2,
-        eps=FLAGS.config.optim_eps,
-        mu_dtype=FLAGS.config.optim_dtype,
-        weight_decay=0.0 if FLAGS.config.wd_indep else FLAGS.config.wd_lam,
-    )
     if FLAGS.config.optim_name == "adamw":
+        kwargs = dict(
+            b1=0.9,
+            b2=0.95,
+            eps=1e-8,
+            mu_dtype=FLAGS.config.optim_dtype,
+            weight_decay=0.0 if FLAGS.config.wd_indep else FLAGS.config.wd_lam,
+        )
         return optax.adamw(FLAGS.config.lr_eta, **common_kwargs)
     elif FLAGS.config.optim_name == "lion":
-        del common_kwargs["eps"]
+        kwargs = dict(
+            b1=0.95,
+            b2=0.98,
+            mu_dtype=FLAGS.config.optim_dtype,
+            weight_decay=0.0 if FLAGS.config.wd_indep else FLAGS.config.wd_lam,
+        )
         return optax.lion(FLAGS.config.lr_eta, **common_kwargs)
     elif FLAGS.config.optim_name == "muon":
+        kwargs = dict(
+            b1=0.9,  # used by adam subset of muon
+            b2=0.95,  # used by adam subset of muon
+            eps=1e-8,  # used by adam subset of muon
+            mu_dtype=FLAGS.config.optim_dtype,
+            weight_decay=0.0 if FLAGS.config.wd_indep else FLAGS.config.wd_lam,
+        )
         return muon(FLAGS.config.lr_eta, **common_kwargs)
     else:
         raise NotImplementedError
@@ -161,7 +213,7 @@ def get_ndbe():
     dm = FLAGS.config.d_model
     dff = int(FLAGS.config.d_model * FLAGS.config.ff_multiple)
     ff_proj_ct = 3
-    ns = FLAGS.config.n_pretrain_step
+    ns = get_n_pretrain_step()
     bsz = FLAGS.config.tokens_per_global_batch
 
     n = nl * (4 * dm ** 2 + ff_proj_ct * dm * dff)
@@ -173,7 +225,7 @@ def get_ndbe():
 
 def get_modelname():
     n, d, b, e = get_ndbe()
-    return f"{FLAGS.group}_{n}_{d}_{b}_{e}"
+    return f"{FLAGS.group}_{b}_{e}"
 
 
 def get_checkpoint_manager():
@@ -302,7 +354,7 @@ def train_loop():
 
     eval_loss = None
     t0 = time.perf_counter()
-    for train_step in range(start_step, FLAGS.config.n_pretrain_step):
+    for train_step in range(start_step, get_n_pretrain_step()):
         batch = get_batch(
             shard=ds_train_shard,
             local_batch_size=local_batch_size,
@@ -319,6 +371,10 @@ def train_loop():
             eval_loss = eval_loop(state)
             eval_loss_logging_op(eval_loss, step)
             do_save(mgr, state, step)
+
+    eval_loss = eval_loop(state)
+    eval_loss_logging_op(eval_loss, step)
+    do_save(mgr, state, step)
 
     return eval_loss
 
