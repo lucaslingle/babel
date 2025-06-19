@@ -141,7 +141,7 @@ def get_optimizer():
             mu_dtype=FLAGS.config.optim_dtype,
             weight_decay=0.0 if FLAGS.config.wd_indep else FLAGS.config.wd_lam,
         )
-        return optax.adamw(FLAGS.config.lr_eta, **common_kwargs)
+        return optax.adamw(FLAGS.config.lr_eta, **kwargs)
     elif FLAGS.config.optim_name == "lion":
         kwargs = dict(
             b1=0.95,
@@ -149,7 +149,7 @@ def get_optimizer():
             mu_dtype=FLAGS.config.optim_dtype,
             weight_decay=0.0 if FLAGS.config.wd_indep else FLAGS.config.wd_lam,
         )
-        return optax.lion(FLAGS.config.lr_eta, **common_kwargs)
+        return optax.lion(FLAGS.config.lr_eta, **kwargs)
     elif FLAGS.config.optim_name == "muon":
         kwargs = dict(
             b1=0.9,  # used by adam subset of muon
@@ -158,7 +158,7 @@ def get_optimizer():
             mu_dtype=FLAGS.config.optim_dtype,
             weight_decay=0.0 if FLAGS.config.wd_indep else FLAGS.config.wd_lam,
         )
-        return muon(FLAGS.config.lr_eta, **common_kwargs)
+        return muon(FLAGS.config.lr_eta, **kwargs)
     else:
         raise NotImplementedError
 
