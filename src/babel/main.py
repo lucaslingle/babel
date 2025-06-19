@@ -95,7 +95,7 @@ def get_transformer_config():
 @functools.lru_cache(maxsize=1)
 def get_global_mesh():
     # mesh settings were optimized via trial and error for tpu v3
-    assert jax.process_count() == 128
+    assert jax.device_count() == 128
     n_mesh_rows = 128 if FLAGS.config.model_size < 10 ** 9 else 32
     n_mesh_cols = 1 if FLAGS.config.model_size < 10 ** 9 else 4
     return jax.sharding.Mesh(
