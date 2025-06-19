@@ -124,27 +124,27 @@ def write_dataset(*, local_batch_size, dataset_config, split, workdir, hf_token)
     )
     tokenizer = get_tokenizer(dataset_config=dc, hf_token=hf_token)
 
-    # if split == "train":
-    #     def filter_func(examples):
-    #         es = examples[dc.datacol]
-    #         es = [e for i, e in enumerate(es) if (i % 100) < 99]
-    #         return dict(filtered_text=es)
-    # else:
-    #     def filter_func(examples):
-    #         es = examples[dc.datacol]
-    #         es = [e for i, e in enumerate(es) if (i % 100) == 99]
-    #         return dict(filtered_text=es)
+    if split == "train":
+        def filter_func(examples):
+            es = examples[dc.datacol]
+            es = [e for i, e in enumerate(es) if (i % 100) < 99]
+            return dict(filtered_text=es)
+    else:
+        def filter_func(examples):
+            es = examples[dc.datacol]
+            es = [e for i, e in enumerate(es) if (i % 100) == 99]
+            return dict(filtered_text=es)
 
-    # ds = ds.map(
-    #     filter_func,
-    #     batched=True,
-    #     batch_size=1000,
-    #     remove_columns=list(ds.column_names),
-    # )
+    ds = ds.map(
+        filter_func,
+        batched=True,
+        batch_size=1000,
+        remove_columns=list(ds.column_names),
+    )
 
     def processing_func(examples):
-        # es = examples["filtered_text"]
-        es = examples[dc.datacol]
+        es = examples["filtered_text"]
+        # es = examples[dc.datacol]
         es = [e for i, e in enumerate(es) if i % pcount == pindex]
         kws = dict(
             padding="max_length",
@@ -159,16 +159,16 @@ def write_dataset(*, local_batch_size, dataset_config, split, workdir, hf_token)
         processing_func,
         batched=True,
         batch_size=processing_bsz,
-        remove_columns=list(ds.column_names),  # remove line if uncommenting everything else
+        # remove_columns=list(ds.column_names),  # remove line if uncommenting everything else
     )
 
     sequences_in_dataset = dc.sequences_in_dataset
-    # if split == "train":
-    #     sequences_in_dataset *= 0.99
-    # else:
-    #     sequences_in_dataset *= 0.01
-    # sequences_in_dataset = int(sequences_in_dataset)
-    # logging.info(f"sequences_in_dataset: {sequences_in_dataset}")
+    if split == "train":
+        sequences_in_dataset *= 0.99
+    else:
+        sequences_in_dataset *= 0.01
+    sequences_in_dataset = int(sequences_in_dataset)
+    logging.info(f"sequences_in_dataset: {sequences_in_dataset}")
     
     sequences_per_shard = sequences_in_dataset // pcount
     lcm = math.lcm(dc.write_buffer_size, local_batch_size)
