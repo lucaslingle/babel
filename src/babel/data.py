@@ -124,23 +124,23 @@ def write_dataset(*, local_batch_size, dataset_config, split, workdir, hf_token)
     )
     tokenizer = get_tokenizer(dataset_config=dc, hf_token=hf_token)
 
-    if split == "train":
-        def filter_func(examples):
-            es = examples[dc.datacol]
-            es = [e for i, e in enumerate(es) if i % 100 < 99]
-            return dict(filtered_text=es)
-    else:
-        def filter_func(examples):
-            es = examples[dc.datacol]
-            es = [e for i, e in enumerate(es) if i % 100 == 99]
-            return dict(filtered_text=es)
+    # if split == "train":
+    #     def filter_func(examples):
+    #         es = examples[dc.datacol]
+    #         es = [e for i, e in enumerate(es) if (i % 100) < 99]
+    #         return dict(filtered_text=es)
+    # else:
+    #     def filter_func(examples):
+    #         es = examples[dc.datacol]
+    #         es = [e for i, e in enumerate(es) if (i % 100) == 99]
+    #         return dict(filtered_text=es)
 
-    ds = ds.map(
-        filter_func,
-        batched=True,
-        batch_size=1000,
-        remove_columns=list(ds.column_names),
-    )
+    # ds = ds.map(
+    #     filter_func,
+    #     batched=True,
+    #     batch_size=1000,
+    #     remove_columns=list(ds.column_names),
+    # )
 
     def processing_func(examples):
         es = examples["filtered_text"]
@@ -161,19 +161,22 @@ def write_dataset(*, local_batch_size, dataset_config, split, workdir, hf_token)
     )
 
     sequences_in_dataset = dc.sequences_in_dataset
-    if split == "train":
-        sequences_in_dataset *= 0.99
-    else:
-        sequences_in_dataset *= 0.01
-    sequences_in_dataset = int(sequences_in_dataset)
+    # if split == "train":
+    #     sequences_in_dataset *= 0.99
+    # else:
+    #     sequences_in_dataset *= 0.01
+    # sequences_in_dataset = int(sequences_in_dataset)
+    # logging.info(f"sequences_in_dataset: {sequences_in_dataset}")
     
     sequences_per_shard = sequences_in_dataset // pcount
     lcm = int(math.lcm(dc.write_buffer_size, local_batch_size))
     writable_sequences_per_shard = (sequences_per_shard // lcm) * lcm
+    logging.info(f"writable_sequences_per_shard: {writable_sequences_per_shard}")
     ds = ds.take(writable_sequences_per_shard)  # drop rest via lazy op
     ds = ds.iter(batch_size=dc.write_buffer_size, drop_last_batch=True)
 
     n_write_iters = writable_sequences_per_shard // dc.write_buffer_size
+    logging.info(f"n_write_iters: {n_write_iters}")
     array = np.memmap(
         local_fp,
         dtype=dc.array_dtype,
@@ -190,7 +193,7 @@ def write_dataset(*, local_batch_size, dataset_config, split, workdir, hf_token)
                 batch = next(ds)["token_ids"]
             except BaseException as e:
                 if tries < 10:
-                    time.sleep(10)
+                    time.sleep(1)
                     tries += 1
                 else:
                     logging.error(e)
