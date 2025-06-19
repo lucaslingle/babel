@@ -162,7 +162,6 @@ def write_dataset(*, local_batch_size, dataset_config, split, workdir, hf_token)
         processing_func,
         batched=True,
         batch_size=processing_bsz,
-        remove_columns=list(ds.column_names), 
     )
 
     sequences_in_dataset = dc.sequences_in_dataset
