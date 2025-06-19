@@ -188,7 +188,8 @@ def write_dataset(*, local_batch_size, dataset_config, split, workdir, hf_token)
             try:
                 batch = next(ds)["token_ids"]
             except BaseException as e:
-                time.sleep(1)
+                #time.sleep(1)
+                raise Exception(e)
         array_batch = np.array(batch, dtype=dc.array_dtype).reshape(-1)
         array[offset: offset + increment] = array_batch
         offset += increment
