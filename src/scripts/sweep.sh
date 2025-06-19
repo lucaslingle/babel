@@ -49,7 +49,7 @@ do
     for LR in 0.0078125 0.005524271728019903 0.00390625 0.0027621358640099515 0.001953125 0.0013810679320049757 0.0009765625 0.0006905339660024879 0.00048828125 0.00034526698300124393 0.000244140625 0.00017263349150062197 0.0001220703125;
     do
         /home/$TPU_HOST_USERNAME/.local/bin/uv run src/babel/main.py \
-            --experiment_group="$SCALING_LOCK-$OPTIM_NAME-$DATASET_NAME-$N-$D" \
+            --group="$SCALING_LOCK-$OPTIM_NAME-$DATASET_NAME-$N-$D" \
             --config="src/babel/configs/base.py" \
             --workdir="gs://tpu_persist_bucket/babel_sweeps/" \
             --hf_token="$HF_TOKEN" \
