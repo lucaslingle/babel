@@ -193,7 +193,8 @@ def write_dataset(*, local_batch_size, dataset_config, split, workdir, hf_token)
                     time.sleep(10)
                     tries += 1
                 else:
-                    raise Exception(e)
+                    logging.error(e)
+                    raise
         array_batch = np.array(batch, dtype=dc.array_dtype).reshape(-1)
         array[offset: offset + increment] = array_batch
         offset += increment
