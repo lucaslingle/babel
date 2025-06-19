@@ -18,13 +18,15 @@ from absl import logging
 DatasetConfig = collections.namedtuple("DatasetConfig", [
     "path",
     "name",
-    "split",
+    "original_split",
     "datacol",
     "sequences_in_dataset",
     "array_dtype",
     "write_buffer_size",
     "tokenizer",
     "tokenizer_adds_bos",
+    "sequence_len",
+    "test_frac",
 ])
 
 
