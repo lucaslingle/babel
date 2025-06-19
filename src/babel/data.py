@@ -174,6 +174,7 @@ def write_dataset(*, local_batch_size, dataset_config, split, workdir, hf_token)
     logging.info(f"sequences_in_dataset: {sequences_in_dataset}")
     
     sequences_per_shard = sequences_in_dataset // pcount
+    logging.info(f"sequences_per_shard: {sequences_per_shard}")
     lcm = math.lcm(dc.write_buffer_size, local_batch_size)
     writable_sequences_per_shard = (sequences_per_shard // lcm) * lcm
     logging.info(f"writable_sequences_per_shard: {writable_sequences_per_shard}")

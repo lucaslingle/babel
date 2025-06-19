@@ -6,8 +6,8 @@ def get_base_config():
 
     config.scaling_lock = "aspect"  # one of "aspect", "depth", "width"
     config.dataset_name = "fineweb"  # one of "fineweb", "commonpile", "cci3hq"
-    config.model_size = 1.2 * 10 ** 9  # used with scaling_lock to derive d_model and n_layer
-    config.token_budget = 26.2 * 10 ** 9  # used with tokens_per_global_batch to derive n_training_steps
+    config.model_size = 1_200_000_000  # used with scaling_lock to derive d_model and n_layer
+    config.token_budget = 26_000_000_000  # used with tokens_per_global_batch to derive n_training_steps
 
     # architecture
     config.param_dtype = "float32"  # master copy of weights in fp32
