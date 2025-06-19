@@ -62,5 +62,5 @@ do
             --config.token_budget="$D" \
             --config.tokens_per_global_batch="$BSZ" \
             --config.lr_eta="$LR";
-  done;
+    done;
 done;
