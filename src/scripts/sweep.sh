@@ -16,7 +16,7 @@ Help() {
   echo
 }
 
-while getopts "f:w:u:l:o:s:" option; do
+while getopts "f:w:u:l:o:s:n:d:h" option; do
   case $option in
     f)
       HF_TOKEN=$OPTARG;;
