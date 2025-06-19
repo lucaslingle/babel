@@ -26,7 +26,6 @@ DatasetConfig = collections.namedtuple("DatasetConfig", [
     "tokenizer",
     "tokenizer_adds_bos",
     "sequence_len",
-    "test_frac",
 ])
 
 
