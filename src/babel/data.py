@@ -126,8 +126,25 @@ def write_dataset(*, local_batch_size, dataset_config, split, workdir, hf_token)
         split=dc.original_split,
         streaming=True,
     )
-    ds = ds.train_test_split(test_size=dc.test_frac)[split]
     tokenizer = get_tokenizer(dataset_config=dc, hf_token=hf_token)
+
+    if split == "train":
+        def filter_func(examples):
+            es = examples[dc.datacol]
+            es = [e for i, e in enumerate(es) if i % 100 < 99]
+            return dict(dc.datacol=es)
+    else:
+        def filter_func(examples):
+            es = examples[dc.datacol]
+            es = [e for i, e in enumerate(es) if i % 100 == 99]
+            return dict(dc.datacol=es)
+
+    ds = ds.map(
+        filter_func,
+        batched=True,
+        batch_size=1000,
+        remove_columns=list(ds.column_names),
+    )
 
     def processing_func(examples):
         es = examples[dc.datacol]
@@ -145,7 +162,6 @@ def write_dataset(*, local_batch_size, dataset_config, split, workdir, hf_token)
         processing_func,
         batched=True,
         batch_size=processing_bsz,
-        remove_columns=list(ds.column_names),
     )
 
     sequences_in_dataset = dc.sequences_in_dataset
