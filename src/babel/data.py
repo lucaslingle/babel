@@ -35,7 +35,7 @@ DATASET_CONFIGS = dict(
         name="sample-10BT", #"sample-350BT",
         original_split="train",
         datacol="text",
-        sequences_in_dataset=14_000_000, #517_000_000,
+        sequences_in_dataset=13_000_000, #517_000_000,
         array_dtype=np.uint16,
         write_buffer_size=512,
         tokenizer="meta-llama/Llama-2-7b-hf",
@@ -143,7 +143,8 @@ def write_dataset(*, local_batch_size, dataset_config, split, workdir, hf_token)
     # )
 
     def processing_func(examples):
-        es = examples["filtered_text"]
+        # es = examples["filtered_text"]
+        es = examples[dc.datacol]
         es = [e for i, e in enumerate(es) if i % pcount == pindex]
         kws = dict(
             padding="max_length",
@@ -158,6 +159,7 @@ def write_dataset(*, local_batch_size, dataset_config, split, workdir, hf_token)
         processing_func,
         batched=True,
         batch_size=processing_bsz,
+        remove_columns=list(ds.column_names),  # remove line if uncommenting everything else
     )
 
     sequences_in_dataset = dc.sequences_in_dataset
@@ -169,7 +171,7 @@ def write_dataset(*, local_batch_size, dataset_config, split, workdir, hf_token)
     # logging.info(f"sequences_in_dataset: {sequences_in_dataset}")
     
     sequences_per_shard = sequences_in_dataset // pcount
-    lcm = int(math.lcm(dc.write_buffer_size, local_batch_size))
+    lcm = math.lcm(dc.write_buffer_size, local_batch_size)
     writable_sequences_per_shard = (sequences_per_shard // lcm) * lcm
     logging.info(f"writable_sequences_per_shard: {writable_sequences_per_shard}")
     ds = ds.take(writable_sequences_per_shard)  # drop rest via lazy op
@@ -187,17 +189,13 @@ def write_dataset(*, local_batch_size, dataset_config, split, workdir, hf_token)
     increment = dc.write_buffer_size * (dc.sequence_len+int(dc.tokenizer_adds_bos))
     for _ in tqdm.tqdm(range(n_write_iters), desc=f"Writing to {local_fp} with memmap"):
         batch = None
-        tries = 0
         while batch is None:
             try:
                 batch = next(ds)["token_ids"]
             except BaseException as e:
-                if tries < 10:
-                    time.sleep(1)
-                    tries += 1
-                else:
-                    logging.error(e)
-                    raise
+                # time.sleep(1)
+                logging.error(e)
+                raise
         array_batch = np.array(batch, dtype=dc.array_dtype).reshape(-1)
         array[offset: offset + increment] = array_batch
         offset += increment
