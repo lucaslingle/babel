@@ -154,6 +154,9 @@ def write_dataset(*, local_batch_size, dataset_config, split, workdir, hf_token)
         es = tokenizer(es, **kws)["input_ids"]
         return dict(token_ids=es)
 
+    logging.info(f"type(ds): {type(ds)}")
+    logging.info(f"type(ds.column_names): {type(ds.column_names)}")
+
     processing_bsz = dc.write_buffer_size * pcount
     ds = ds.map(
         processing_func,
