@@ -30,7 +30,7 @@ from babel.sharding import sharding_constraint
 from babel.sharding import to_global_array
 
 FLAGS = flags.FLAGS
-PROJECT_NAME = "babel_muon_fp32_ablation_medium"
+PROJECT_NAME = "babel_polarexpress_ablation_medium"
 config_flags.DEFINE_config_file("config", None, "Config file", lock_config=False)
 flags.DEFINE_string("workdir", None, "Working directory (GCS or local)")
 flags.DEFINE_string("group", None, "Group name for experiment")
@@ -87,7 +87,8 @@ def get_schedule():
 
 
 def get_optimizer():
-    common_kwargs = dict(
+    kwargs = dict(
+        ns_steps=FLAGS.config.optim_ns_steps,
         b1=FLAGS.config.optim_beta1,
         b2=FLAGS.config.optim_beta2,
         eps=FLAGS.config.optim_eps,
@@ -95,12 +96,14 @@ def get_optimizer():
         weight_decay=0.0 if FLAGS.config.wd_indep else FLAGS.config.wd_lam,
     )
     if FLAGS.config.optim_name == "adamw":
-        return optax.adamw(FLAGS.config.lr_eta, **common_kwargs)
+        del kwargs["ns_steps"]
+        return optax.adamw(FLAGS.config.lr_eta, **kwargs)
     elif FLAGS.config.optim_name == "lion":
-        del common_kwargs["eps"]
-        return optax.lion(FLAGS.config.lr_eta, **common_kwargs)
+        del kwargs["ns_steps"]
+        del kwargs["eps"]
+        return optax.lion(FLAGS.config.lr_eta, **kwargs)
     elif FLAGS.config.optim_name == "muon":
-        return muon(FLAGS.config.lr_eta, **common_kwargs)
+        return muon(FLAGS.config.lr_eta, **kwargs)
     else:
         raise NotImplementedError
 

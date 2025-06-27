@@ -14,9 +14,24 @@ from typing import Any, Optional, Union, NamedTuple
 MaskOrFn = Optional[Union[Any, Callable[[base.Params], Any]]]
 
 
+NS_COEFS = [
+    [8.28721201814563, -23.595886519098837, 17.300387312530933],
+    [4.107059111542203, -2.9478499167379106, 0.5448431082926601],
+    [3.9486908534822946, -2.908902115962949, 0.5518191394370137],
+    [3.3184196573706015, -2.488488024314874, 0.51004894012372],
+    [2.300652019954817, -1.6689039845747493, 0.4188073119525673],
+    [1.891301407787398, -1.2679958271945868, 0.37680408948524835],
+    [1.8750014808534479, -1.2500016453999487, 0.3750001645474248],
+    [1.875, -1.25, 0.375], # subsequent coeffs equal this numerically
+    [1.875, -1.25, 0.375], # subsequent coeffs equal this numerically
+    [1.875, -1.25, 0.375], # subsequent coeffs equal this numerically
+]
+NS_COEFS = [[a / 1.01, b / 1.01**3, c / 1.01**5] for (a, b, c) in NS_COEFS[:-1]] + [NS_COEFS[-1]]
+
+
 def orthogonalize_matrix(
     x: jax.Array,  # should have shape (n_layer, in_dim, out_dim)
-    ns_steps: int = 5,
+    ns_steps: int,
     eps: float = 1e-7,
 ) -> jax.Array:
 
@@ -26,13 +41,14 @@ def orthogonalize_matrix(
         x = x.transpose(0, 2, 1)
         transposed = True
 
-    def newton_schulz_iterator(X: jax.Array) -> jax.Array:
+    def newton_schulz_iterator(X: jax.Array, abc: jax.Array) -> jax.Array:
         A = X @ X.transpose(0, 2, 1)
-        B = b * A + c * A @ A
-        return a * X + B @ X
+        B = abc[1] * A + abc[2] * A @ A
+        return abc[0] * X + B @ X
 
     x /= jnp.linalg.norm(x, axis=(1, 2), keepdims=True) + jnp.array([eps], dtype=x.dtype)
-    x = jax.lax.fori_loop(0, ns_steps, lambda _, x: newton_schulz_iterator(x), x)
+    ns_coefs = jnp.array(NS_COEFS[0:ns_steps])
+    x, _ = jax.lax.scan(lambda x, abc: (newton_schulz_iterator(x, abc), None), x, ns_coefs)
     if transposed:
         x = x.transpose(0, 2, 1)
     return x
@@ -67,12 +83,12 @@ class MuonState(NamedTuple):
     
 
 def scale_by_muon(
+    ns_steps: int,
     momentum: float = 0.95,
     *,
     mu_dtype: Optional[chex.ArrayDType] = None,
     nesterov: bool = True,
     eps: float = 1e-7,
-    ns_steps: int = 5,
     base_scale: float = 0.2,
 ) -> base.GradientTransformation:
     mu_dtype = utils.canonicalize_dtype(mu_dtype)
@@ -111,11 +127,11 @@ def param_labels_func(params):
 
 def muon(
     learning_rate: base.ScalarOrSchedule,
+    ns_steps: int,
     momentum: float = 0.95,
     *,
     mu_dtype: Optional[chex.ArrayDType] = None,
     nesterov: bool = True,
-    ns_steps: int = 5,
     base_scale: float = 0.2,
     b1: float = 0.9,
     b2: float = 0.95,

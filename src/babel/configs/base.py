@@ -30,6 +30,7 @@ def get_base_config():
     config.optim_beta1 = 0.9
     config.optim_beta2 = 0.95
     config.optim_eps = 1e-8
+    config.optim_ns_steps = 5   # muon/polar express only
     config.wd_lam = 0.1  # weight decay lambda
     config.wd_indep = False  # use independent weight decay?
 
