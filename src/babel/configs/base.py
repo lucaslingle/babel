@@ -18,6 +18,7 @@ def get_base_config():
     config.rotary_base = 10_000  # rope theta
     config.rmsnorm_params = True  # rmsnorm scale params
     config.rmsnorm_eps = 1e-6  # rmsnorm epsilon
+    config.qk_norm = False  # normalize queries and keys?
 
     # optimization
     config.tokens_per_global_batch = 2**18  # batch size * sequence len

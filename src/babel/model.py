@@ -71,6 +71,49 @@ class RMSNorm(nn.Module):
         return output
 
 
+class QNorm(nn.Module):
+    cfg: TransformerConfig
+    global_mesh: jax.sharding.Mesh
+    suffix: str = "aq"
+
+    @nn.compact
+    def __call__(self, x):
+        n_groups = self.cfg.d_model // (self.cfg.n_heads_per_group * self.cfg.d_head)
+        n_heads_per_group = self.cfg.n_heads_per_group
+        eps = jnp.array([self.cfg.rmsnorm_eps], dtype=x.dtype)
+        rms = jnp.sqrt(jnp.mean(jnp.square(x), axis=-1) + eps)
+        output = x / rms[..., None]
+        if self.cfg.rmsnorm_params:
+            output *= self.param(
+                "g_" + self.suffix,
+                nn.with_partitioning(jax.nn.initializers.ones, MESH_AXES["NNN"], self.global_mesh),
+                [n_groups, n_heads_per_group, self.cfg.d_head],
+                self.cfg.param_dtype,
+            ).astype(self.cfg.dtype).expand_dims(0).expand_dims(-2)
+        return output
+
+
+class KNorm(nn.Module):
+    cfg: TransformerConfig
+    global_mesh: jax.sharding.Mesh
+    suffix: str = "ak"
+
+    @nn.compact
+    def __call__(self, x):
+        n_groups = self.cfg.d_model // (self.cfg.n_heads_per_group * self.cfg.d_head)
+        eps = jnp.array([self.cfg.rmsnorm_eps], dtype=x.dtype)
+        rms = jnp.sqrt(jnp.mean(jnp.square(x), axis=-1) + eps)
+        output = x / rms[..., None]
+        if self.cfg.rmsnorm_params:
+            output *= self.param(
+                "g_" + self.suffix,
+                nn.with_partitioning(jax.nn.initializers.ones, MESH_AXES["NN"], self.global_mesh),
+                [n_groups, self.cfg.d_head],
+                self.cfg.param_dtype,
+            ).astype(self.cfg.dtype).expand_dims(0).expand_dims(-2)
+        return output
+
+
 class RotaryEncoding(nn.Module):
     cfg: TransformerConfig
     global_mesh: jax.sharding.Mesh
@@ -173,6 +216,10 @@ class GroupedQueryAttention(nn.Module):
         q = sharding_constraint(q, MESH_AXES["XYNNN"], self.global_mesh)
         k = sharding_constraint(k, MESH_AXES["XYNN"], self.global_mesh)
         v = sharding_constraint(v, MESH_AXES["XYNN"], self.global_mesh)
+
+        if self.qk_norm:
+            q = QNorm(self.cfg, self.global_mesh)(q)
+            k = KNorm(self.cfg, self.global_mesh)(q)
 
         rope_kws = dict(cfg=self.cfg, global_mesh=self.global_mesh)
         q = RotaryEncoding(**rope_kws, is_queries=True)(q)

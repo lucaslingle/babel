@@ -229,7 +229,7 @@ def get_ndbe():
 
 def get_modelname():
     n, d, b, e = get_ndbe()
-    return f"{FLAGS.group}_{b}_{e}"
+    return f"{FLAGS.group}-{b}-{e}"
 
 
 def get_checkpoint_manager():
