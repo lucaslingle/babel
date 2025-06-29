@@ -85,12 +85,13 @@ class QNorm(nn.Module):
         rms = jnp.sqrt(jnp.mean(jnp.square(x), axis=-1) + eps)
         output = x / rms[..., None]
         if self.cfg.rmsnorm_params:
-            output *= self.param(
+            gains = self.param(
                 "g_" + self.suffix,
                 nn.with_partitioning(jax.nn.initializers.ones, MESH_AXES["NNN"], self.global_mesh),
                 [n_groups, n_heads_per_group, self.cfg.d_head],
                 self.cfg.param_dtype,
-            ).astype(self.cfg.dtype).expand_dims(0).expand_dims(-2)
+            ).astype(self.cfg.dtype)
+            output *= jnp.expand_dims(jnp.expand_dims(gains, 0), -2)
         return output
 
 
@@ -106,12 +107,13 @@ class KNorm(nn.Module):
         rms = jnp.sqrt(jnp.mean(jnp.square(x), axis=-1) + eps)
         output = x / rms[..., None]
         if self.cfg.rmsnorm_params:
-            output *= self.param(
+            gains = self.param(
                 "g_" + self.suffix,
                 nn.with_partitioning(jax.nn.initializers.ones, MESH_AXES["NN"], self.global_mesh),
                 [n_groups, self.cfg.d_head],
                 self.cfg.param_dtype,
-            ).astype(self.cfg.dtype).expand_dims(0).expand_dims(-2)
+            ).astype(self.cfg.dtype)
+            output *= jnp.expand_dims(jnp.expand_dims(gains, 0), -2)
         return output
 
 
