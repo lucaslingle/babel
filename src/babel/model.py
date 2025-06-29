@@ -222,7 +222,7 @@ class GroupedQueryAttention(nn.Module):
 
         if self.cfg.qk_norm:
             q = QNorm(self.cfg, self.global_mesh)(q)
-            k = KNorm(self.cfg, self.global_mesh)(q)
+            k = KNorm(self.cfg, self.global_mesh)(k)
 
         rope_kws = dict(cfg=self.cfg, global_mesh=self.global_mesh)
         q = RotaryEncoding(**rope_kws, is_queries=True)(q)
