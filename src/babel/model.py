@@ -30,6 +30,7 @@ class TransformerConfig:
     rotary_base: int
     rmsnorm_params: bool
     rmsnorm_eps: float
+    qk_norm: bool
 
     @classmethod
     def create(cls, **kwargs):
@@ -217,7 +218,7 @@ class GroupedQueryAttention(nn.Module):
         k = sharding_constraint(k, MESH_AXES["XYNN"], self.global_mesh)
         v = sharding_constraint(v, MESH_AXES["XYNN"], self.global_mesh)
 
-        if self.qk_norm:
+        if self.cfg.qk_norm:
             q = QNorm(self.cfg, self.global_mesh)(q)
             k = KNorm(self.cfg, self.global_mesh)(q)
 
