@@ -9,8 +9,6 @@ Help() {
   echo "b     weights and biases token."
   echo "u     uv path."
   echo "t     using a tpu cluster?"
-  echo "q     qk norm: true or false?."
-  echo "i     indep weight decay: true or false?."
   echo "l     scaling lock: one of aspect, depth, width."
   echo "o     optimizer name: one of adamw, lion, muon."
   echo "s     dataset name: one of fineweb, commonpile, cci3hq."
