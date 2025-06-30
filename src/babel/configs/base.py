@@ -35,6 +35,7 @@ def get_base_config():
     # periodic action settings
     config.n_log_step = 100  # log every
     config.n_checkpoint_step = 1000  # checkpoint every
+    config.n_fast_eval_step = 100
 
     return config
 
