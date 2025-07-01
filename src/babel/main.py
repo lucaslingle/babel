@@ -378,14 +378,14 @@ def train_loop():
             eval_loss_logging_op(eval_loss, step)
             do_save(mgr, state, step)
 
-    eval_loss = eval_loop(state, is_final=True)
+    eval_loss = eval_loop(state)
     eval_loss_logging_op(eval_loss, step)
     do_save(mgr, state, step)
 
     return eval_loss
 
 
-def eval_loop(state, is_final=False):
+def eval_loop(state, is_fast=True):
     global_mesh = get_global_mesh()
 
     n_host = jax.process_count()
@@ -403,7 +403,7 @@ def eval_loop(state, is_final=False):
         local_batch_size=local_batch_size,
         dataset_config=get_dataset_config(),
     )
-    if not is_final:
+    if is_fast:
         batch_count = min(batch_count, FLAGS.config.n_fast_eval_step)
 
     loss_terms = []
