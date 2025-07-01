@@ -390,7 +390,8 @@ def eval_loop(state, is_fast=True):
 
     n_host = jax.process_count()
     n_ctx = get_dataset_config().sequence_len
-    local_batch_size = FLAGS.config.tokens_per_global_batch // (n_host * n_ctx)
+    eval_tokens_per_global_batch = 2 ** 21
+    local_batch_size = eval_tokens_per_global_batch // (n_host * n_ctx)
     ds_test_shard = get_dataset(
         local_batch_size=local_batch_size,
         dataset_config=get_dataset_config(),
