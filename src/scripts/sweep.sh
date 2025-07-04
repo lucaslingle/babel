@@ -50,11 +50,12 @@ while getopts "w:f:b:u:t:l:o:s:n:d:h" option; do
 done
 
 
-for BSZ in 32768 65536 131072 262144 524288 1048576 2097152;
+for BSZ in 32768 65536 131072 262144;
 do
-    for LR in 0.0078125 0.005524271728019903 0.00390625 0.0027621358640099515 0.001953125 0.0013810679320049757 0.0009765625 0.0006905339660024879 0.00048828125 0.00034526698300124393 0.000244140625 0.00017263349150062197 0.0001220703125;
-    do
-        echo "Starting run with bsz $BSZ and lr $LR";
+  for LR in 0.00390625 0.001953125 0.0009765625 0.00048828125 0.00024414062;
+  do
+    for WD in 0.0009765625 0.00024414062 0.00006103515 0.00001525878 0.00000381469;
+        echo "Starting run with bsz $BSZ, lr $LR, wd $WD";
         "$UV_PATH" run src/babel/main.py \
             --group="$SCALING_LOCK-$OPTIM_NAME-$DATASET_NAME-$N-$D" \
             --config="src/babel/configs/base.py" \
@@ -69,8 +70,8 @@ do
             --config.token_budget="$D" \
             --config.tokens_per_global_batch="$BSZ" \
             --config.lr_eta="$LR" \
-            --config.wd_lam=0.00001 \
+            --config.wd_lam="$WD" \
             --config.wd_indep=True \
             --config.qk_norm=True; 
-    done;
+  done;
 done;
