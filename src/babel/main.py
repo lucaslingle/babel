@@ -211,8 +211,8 @@ def get_train_state(rng_init):
     return initialized_state
 
 
-def get_ndbe():
-    # returns (param ct, token ct, global bsz in tokens, lr)
+def get_ndbel():
+    # returns (param ct, token ct, global bsz in tokens, lr eta, wd lam)
     nl = get_n_layer()
     dm = get_d_model()
     dff = int(get_d_model() * FLAGS.config.ff_multiple)
@@ -224,12 +224,13 @@ def get_ndbe():
     d = ns * bsz
     b = bsz
     e = FLAGS.config.lr_eta
-    return n, d, b, e
+    l = FLAGS.config.wd_lam
+    return n, d, b, e, l
 
 
 def get_modelname():
-    n, d, b, e = get_ndbe()
-    return f"{FLAGS.group}-{b}-{e}"
+    n, d, b, e, l = get_ndbel()
+    return f"{FLAGS.group}-{b}-{e}-{l}"
 
 
 def get_checkpoint_manager():
@@ -447,10 +448,10 @@ def main(argv):
     eval_loss = train_loop()
 
     if jax.process_index() == 0:
-        n, d, b, e = get_ndbe()
+        n, d, b, e, l = get_ndbel()
         table = wandb.Table(
-            columns=["Group", "N", "D", "B", "E", "Loss"],
-            data=[[FLAGS.group, n, d, b, e, eval_loss]],
+            columns=["Group", "N", "D", "B", "E", "L", "Loss"],
+            data=[[FLAGS.group, n, d, b, e, l, eval_loss]],
         )
         wandb.log({"sweep_table": table})
 
