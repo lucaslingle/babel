@@ -55,23 +55,25 @@ do
   for LR in 0.00390625 0.001953125 0.0009765625 0.00048828125 0.00024414062;
   do
     for WD in 0.0009765625 0.00024414062 0.00006103515 0.00001525878 0.00000381469;
-        echo "Starting run with bsz $BSZ, lr $LR, wd $WD";
-        "$UV_PATH" run src/babel/main.py \
-            --group="$SCALING_LOCK-$OPTIM_NAME-$DATASET_NAME-$N-$D" \
-            --config="src/babel/configs/base.py" \
-            --workdir="$WORKDIR" \
-            --hf_token="$HF_TOKEN" \
-            --wb_token="$WB_TOKEN" \
-            --tpu="$TPU_CLUSTER" \
-            --config.scaling_lock="$SCALING_LOCK" \
-            --config.optim_name="$OPTIM_NAME" \
-            --config.dataset_name="$DATASET_NAME" \
-            --config.model_size="$N" \
-            --config.token_budget="$D" \
-            --config.tokens_per_global_batch="$BSZ" \
-            --config.lr_eta="$LR" \
-            --config.wd_lam="$WD" \
-            --config.wd_indep=True \
-            --config.qk_norm=True; 
+    do
+      echo "Starting run with bsz $BSZ, lr $LR, wd $WD";
+      "$UV_PATH" run src/babel/main.py \
+        --group="$SCALING_LOCK-$OPTIM_NAME-$DATASET_NAME-$N-$D" \
+        --config="src/babel/configs/base.py" \
+        --workdir="$WORKDIR" \
+        --hf_token="$HF_TOKEN" \
+        --wb_token="$WB_TOKEN" \
+        --tpu="$TPU_CLUSTER" \
+        --config.scaling_lock="$SCALING_LOCK" \
+        --config.optim_name="$OPTIM_NAME" \
+        --config.dataset_name="$DATASET_NAME" \
+        --config.model_size="$N" \
+        --config.token_budget="$D" \
+        --config.tokens_per_global_batch="$BSZ" \
+        --config.lr_eta="$LR" \
+        --config.wd_lam="$WD" \
+        --config.wd_indep=True \
+        --config.qk_norm=True; 
+    done;
   done;
 done;
