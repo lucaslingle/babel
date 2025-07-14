@@ -4,6 +4,7 @@ from typing import Any
 import chex
 import einops
 import flax.linen as nn
+from flax.linen.transforms import C
 import jax
 import jax.numpy as jnp
 from flax import struct
@@ -287,10 +288,21 @@ class TransformerBlock(nn.Module):
     @nn.compact
     def __call__(self, x, _):
         kws = dict(cfg=self.cfg, global_mesh=self.global_mesh)
-        x += GroupedQueryAttention(**kws)(RMSNorm(**kws, suffix="a")(x))
+
+        y = RMSNorm(**kws, suffix="ain")(x)
+        y = sharding_constraint(y, MESH_AXES["XNY"], self.global_mesh)
+        r = GroupedQueryAttention(**kws)(y)
+        r = RMSNorm(**kws, suffix="aout")(r)
+        x += r
         x = sharding_constraint(x, MESH_AXES["XNY"], self.global_mesh)
-        x += PositionwiseFeedforward(**kws)(RMSNorm(**kws, suffix="f")(x))
+
+        y = RMSNorm(**kws, suffix="fin")(x)
+        y = sharding_constraint(y, MESH_AXES["XNY"], self.global_mesh)
+        r = PositionwiseFeedforward(**kws)(y)
+        r = RMSNorm(**kws, suffix="fout")(r)
+        x += r
         x = sharding_constraint(x, MESH_AXES["XNY"], self.global_mesh)
+
         return x, None
 
 
@@ -307,13 +319,14 @@ class Embedding(nn.Module):
             [self.cfg.n_vocab, self.cfg.d_model],
             self.cfg.param_dtype,
         )
-        x = jnp.take_along_axis(
+        e = jnp.take_along_axis(
             we.astype(self.cfg.dtype)[None, ...],  # 1VM
             x[..., None],  # BT1
             axis=1,
         )
-        x = sharding_constraint(x, MESH_AXES["XNY"], self.global_mesh)
-        return x
+        e = RMSNorm(cfg=self.cfg, global_mesh=self.global_mesh, suffix="eout")(e)
+        e = sharding_constraint(e, MESH_AXES["XNY"], self.global_mesh)
+        return e
 
 
 class Unembedding(nn.Module):
@@ -330,10 +343,10 @@ class Unembedding(nn.Module):
             [self.cfg.d_model, self.cfg.n_vocab],
             self.cfg.param_dtype,
         )
-        x = RMSNorm(self.cfg, self.global_mesh, "u")(x)
-        x = jnp.einsum("btm,mv->btv", x, wu, **einsum_kwargs)
-        x = sharding_constraint(x, MESH_AXES["XNN"], self.global_mesh)
-        return x
+        y = RMSNorm(self.cfg, self.global_mesh, "uin")(x)
+        u = jnp.einsum("btm,mv->btv", y, wu, **einsum_kwargs)
+        u = sharding_constraint(u, MESH_AXES["XNN"], self.global_mesh)
+        return u
 
 
 class Transformer(nn.Module):
