@@ -71,6 +71,7 @@ do
             --config.lr_eta="$LR" \
             --config.wd_lam=0.00001 \
             --config.wd_indep=True \
-            --config.qk_norm=True; 
+            --config.qk_norm=False \
+            --config.rmsnorm_params=False;
     done;
 done;
