@@ -23,7 +23,7 @@ def get_base_config():
     # optimization
     config.tokens_per_global_batch = 2**18  # batch size * sequence len
     config.grad_clip = 1.0  # grad clip max l2 norm
-    config.optim_name = "adamw"  # one of "adamw", "lion", "muon"
+    config.optim_name = "muon"  # one of "adamw", "lion", "muon"
     config.optim_dtype = "float32"
     config.lr_eta = 0.0003  # learning rate
     config.lr_schedule_name = "cosine"
