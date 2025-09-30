@@ -30,7 +30,7 @@ from babel.sharding import sharding_constraint
 from babel.sharding import to_global_array
 
 FLAGS = flags.FLAGS
-PROJECT_NAME = "serious_mode_muon_ablation_v2"
+PROJECT_NAME = "tpu_v6e_main"
 config_flags.DEFINE_config_file("config", None, "Config file", lock_config=False)
 flags.DEFINE_string("workdir", None, "Working directory (GCS or local)")
 flags.DEFINE_string("group", None, "Group name for experiment")
