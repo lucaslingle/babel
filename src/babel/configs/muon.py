@@ -5,8 +5,8 @@ def get_config():
     config = get_base_config()
 
     # mesh
-    config.n_mesh_rows = 16
-    config.n_mesh_cols = 4
+    config.n_mesh_rows = 8
+    config.n_mesh_cols = 8
 
     # width
     config.d_model = 3584
