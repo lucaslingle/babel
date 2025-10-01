@@ -3,7 +3,7 @@ from ml_collections import config_dict
 
 def get_base_config():
     config = config_dict.ConfigDict()
-    config.n_mesh_rows = 128
+    config.n_mesh_rows = 64
     config.n_mesh_cols = 1
 
     # architecture
